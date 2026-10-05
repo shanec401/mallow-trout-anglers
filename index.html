@@ -668,12 +668,22 @@
     const byAngler = {};
     set.forEach(c => {
       const key = c.anglerId || 'unknown';
-      byAngler[key] = byAngler[key] || { count: 0, species: new Set() };
+      byAngler[key] = byAngler[key] || { count: 0, species: new Set(), totalWeight: 0, biggestWeight: 0 };
       byAngler[key].count++;
       if (c.species) byAngler[key].species.add(c.species);
+      if (typeof c.weight === 'number') {
+        byAngler[key].totalWeight += c.weight;
+        if (c.weight > byAngler[key].biggestWeight) byAngler[key].biggestWeight = c.weight;
+      }
     });
     const mostCatchesEntry = Object.entries(byAngler).sort((a, b) => b[1].count - a[1].count)[0];
     const mostSpeciesEntry = Object.entries(byAngler).sort((a, b) => b[1].species.size - a[1].species.size)[0];
+
+    // Full angler-by-angler leaderboard, ranked by catch count (ties broken
+    // by total weight), so every angler shows up, not just the top one.
+    const anglerRows = Object.entries(byAngler)
+      .map(([id, v]) => ({ anglerId: id, count: v.count, speciesCount: v.species.size, totalWeight: v.totalWeight, biggestWeight: v.biggestWeight }))
+      .sort((a, b) => b.count - a.count || b.totalWeight - a.totalWeight);
 
     const bySpecies = {};
     withWeight.forEach(c => {
@@ -690,7 +700,7 @@
       (b.createdAt || 0) - (a.createdAt || 0)
     );
 
-    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, allRows };
+    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, allRows, anglerRows };
   }
 
   function renderBoard() {
@@ -713,6 +723,16 @@
     html += statCard('Most species caught', data.mostSpeciesEntry ? (data.mostSpeciesEntry[1].species.size + '') : '—',
       data.mostSpeciesEntry ? escapeHtml(nameOf(data.mostSpeciesEntry[0])) : '');
     html += '</div>';
+
+    html += '<div class="card"><h3 class="sub-title">Anglers (' + data.anglerRows.length + ')</h3>';
+    html += '<div class="table-scroll"><table><thead><tr><th>#</th><th>Angler</th><th>Catches</th><th>Species</th><th>Biggest catch</th><th>Total weight</th></tr></thead><tbody>';
+    data.anglerRows.forEach((a, i) => {
+      const isMe = a.anglerId === myId;
+      html += '<tr' + (isMe ? ' style="font-weight:700;"' : '') + '><td>' + (i + 1) + '</td><td>' + escapeHtml(nameOf(a.anglerId)) + (isMe ? ' (you)' : '') + '</td>' +
+        '<td>' + a.count + '</td><td>' + a.speciesCount + '</td>' +
+        '<td>' + (a.biggestWeight ? a.biggestWeight + ' g' : '—') + '</td><td>' + (a.totalWeight ? a.totalWeight + ' g' : '—') + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
 
     html += '<div class="card"><h3 class="sub-title">Biggest catch per species</h3>';
     if (data.speciesRows.length) {
