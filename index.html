@@ -697,11 +697,11 @@
       .sort((a, b) => b.totalLength - a.totalLength || b.totalWeight - a.totalWeight || b.count - a.count);
 
     const bySpecies = {};
-    withWeight.forEach(c => {
+    withLength.forEach(c => {
       const key = c.species || 'Unknown';
-      if (!bySpecies[key] || c.weight > bySpecies[key].weight) bySpecies[key] = c;
+      if (!bySpecies[key] || c.length > bySpecies[key].length) bySpecies[key] = c;
     });
-    const speciesRows = Object.values(bySpecies).sort((a, b) => b.weight - a.weight);
+    const speciesRows = Object.values(bySpecies).sort((a, b) => b.length - a.length);
 
     return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, anglerRows };
   }
@@ -717,10 +717,10 @@
     }
 
     let html = '<div class="board-grid">';
-    html += statCard('Biggest catch', data.biggestByWeight ? (data.biggestByWeight.weight + ' g') : '—',
-      data.biggestByWeight ? (escapeHtml(data.biggestByWeight.species) + ' · ' + escapeHtml(nameOf(data.biggestByWeight.anglerId))) : 'No weights logged yet');
     html += statCard('Longest catch', data.longest ? (data.longest.length + ' cm') : '—',
       data.longest ? (escapeHtml(data.longest.species) + ' · ' + escapeHtml(nameOf(data.longest.anglerId))) : 'No lengths logged yet');
+    html += statCard('Biggest catch', data.biggestByWeight ? (data.biggestByWeight.weight + ' g') : '—',
+      data.biggestByWeight ? (escapeHtml(data.biggestByWeight.species) + ' · ' + escapeHtml(nameOf(data.biggestByWeight.anglerId))) : 'No weights logged yet');
     html += statCard('Most catches', data.mostCatchesEntry ? (data.mostCatchesEntry[1].count + '') : '—',
       data.mostCatchesEntry ? escapeHtml(nameOf(data.mostCatchesEntry[0])) : '');
     html += statCard('Most species caught', data.mostSpeciesEntry ? (data.mostSpeciesEntry[1].species.size + '') : '—',
@@ -738,15 +738,15 @@
     });
     html += '</tbody></table></div></div>';
 
-    html += '<div class="card"><h3 class="sub-title">Biggest catch per species</h3>';
+    html += '<div class="card"><h3 class="sub-title">Longest catch per species</h3>';
     if (data.speciesRows.length) {
-      html += '<div class="table-scroll"><table><thead><tr><th>Species</th><th>Weight</th><th>Angler</th><th>Date</th></tr></thead><tbody>';
+      html += '<div class="table-scroll"><table><thead><tr><th>Species</th><th>Length</th><th>Angler</th><th>Date</th></tr></thead><tbody>';
       data.speciesRows.forEach(c => {
-        html += '<tr><td>' + escapeHtml(c.species) + '</td><td>' + c.weight + ' g</td><td>' + escapeHtml(nameOf(c.anglerId)) + '</td><td>' + fmtDate(c.date) + '</td></tr>';
+        html += '<tr><td>' + escapeHtml(c.species) + '</td><td>' + c.length + ' cm</td><td>' + escapeHtml(nameOf(c.anglerId)) + '</td><td>' + fmtDate(c.date) + '</td></tr>';
       });
       html += '</tbody></table></div>';
     } else {
-      html += '<div class="empty-state">Log a weight to start the species board.</div>';
+      html += '<div class="empty-state">Log a length to start the species board.</div>';
     }
     html += '</div>';
 
