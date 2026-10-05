@@ -665,25 +665,36 @@
     const biggestByWeight = withWeight.slice().sort((a, b) => b.weight - a.weight)[0];
     const longest = withLength.slice().sort((a, b) => b.length - a.length)[0];
 
+    const compNameById = {};
+    competitions.forEach(c => { compNameById[c.id] = c.name; });
+
     const byAngler = {};
     set.forEach(c => {
       const key = c.anglerId || 'unknown';
-      byAngler[key] = byAngler[key] || { count: 0, species: new Set(), totalWeight: 0, biggestWeight: 0 };
+      byAngler[key] = byAngler[key] || { count: 0, species: new Set(), totalWeight: 0, biggestWeight: 0, totalLength: 0, comps: new Set() };
       byAngler[key].count++;
       if (c.species) byAngler[key].species.add(c.species);
       if (typeof c.weight === 'number') {
         byAngler[key].totalWeight += c.weight;
         if (c.weight > byAngler[key].biggestWeight) byAngler[key].biggestWeight = c.weight;
       }
+      if (typeof c.length === 'number') byAngler[key].totalLength += c.length;
+      byAngler[key].comps.add(c.competitionId ? (compNameById[c.competitionId] || 'Unknown competition') : 'General log');
     });
     const mostCatchesEntry = Object.entries(byAngler).sort((a, b) => b[1].count - a[1].count)[0];
     const mostSpeciesEntry = Object.entries(byAngler).sort((a, b) => b[1].species.size - a[1].species.size)[0];
 
-    // Full angler-by-angler leaderboard, ranked by catch count (ties broken
-    // by total weight), so every angler shows up, not just the top one.
+    // Full angler-by-angler leaderboard — one row per angler, never repeated —
+    // ranked by total length first (the club's main measure), ties broken by
+    // total weight then catch count.
     const anglerRows = Object.entries(byAngler)
-      .map(([id, v]) => ({ anglerId: id, count: v.count, speciesCount: v.species.size, totalWeight: v.totalWeight, biggestWeight: v.biggestWeight }))
-      .sort((a, b) => b.count - a.count || b.totalWeight - a.totalWeight);
+      .map(([id, v]) => ({
+        anglerId: id, count: v.count, speciesCount: v.species.size,
+        totalWeight: v.totalWeight, biggestWeight: v.biggestWeight,
+        totalLength: Math.round(v.totalLength * 10) / 10,
+        comps: Array.from(v.comps)
+      }))
+      .sort((a, b) => b.totalLength - a.totalLength || b.totalWeight - a.totalWeight || b.count - a.count);
 
     const bySpecies = {};
     withWeight.forEach(c => {
@@ -692,15 +703,7 @@
     });
     const speciesRows = Object.values(bySpecies).sort((a, b) => b.weight - a.weight);
 
-    // Every catch in this view, ranked — heaviest first, then longest,
-    // then most recent for anything with no weight or length logged.
-    const allRows = set.slice().sort((a, b) =>
-      (b.weight || -1) - (a.weight || -1) ||
-      (b.length || -1) - (a.length || -1) ||
-      (b.createdAt || 0) - (a.createdAt || 0)
-    );
-
-    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, allRows, anglerRows };
+    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, anglerRows };
   }
 
   function renderBoard() {
@@ -725,12 +728,13 @@
     html += '</div>';
 
     html += '<div class="card"><h3 class="sub-title">Anglers (' + data.anglerRows.length + ')</h3>';
-    html += '<div class="table-scroll"><table><thead><tr><th>#</th><th>Angler</th><th>Catches</th><th>Species</th><th>Biggest catch</th><th>Total weight</th></tr></thead><tbody>';
+    html += '<p style="font-size:0.8rem;color:var(--text-soft);margin-top:-10px;">Ranked by total length — one row per angler.</p>';
+    html += '<div class="table-scroll"><table><thead><tr><th>#</th><th>Angler</th><th>Fish</th><th>Competition</th><th>Total weight</th><th>Total length</th></tr></thead><tbody>';
     data.anglerRows.forEach((a, i) => {
       const isMe = a.anglerId === myId;
       html += '<tr' + (isMe ? ' style="font-weight:700;"' : '') + '><td>' + (i + 1) + '</td><td>' + escapeHtml(nameOf(a.anglerId)) + (isMe ? ' (you)' : '') + '</td>' +
-        '<td>' + a.count + '</td><td>' + a.speciesCount + '</td>' +
-        '<td>' + (a.biggestWeight ? a.biggestWeight + ' g' : '—') + '</td><td>' + (a.totalWeight ? a.totalWeight + ' g' : '—') + '</td></tr>';
+        '<td>' + a.count + '</td><td>' + escapeHtml(a.comps.join(', ')) + '</td>' +
+        '<td>' + (a.totalWeight ? a.totalWeight + ' g' : '—') + '</td><td>' + (a.totalLength ? a.totalLength + ' cm' : '—') + '</td></tr>';
     });
     html += '</tbody></table></div></div>';
 
@@ -745,15 +749,6 @@
       html += '<div class="empty-state">Log a weight to start the species board.</div>';
     }
     html += '</div>';
-
-    html += '<div class="card"><h3 class="sub-title">All catches ranked (' + data.allRows.length + ')</h3>';
-    html += '<div class="table-scroll"><table><thead><tr><th>#</th><th>Angler</th><th>Species</th><th>Weight</th><th>Length</th><th>Date</th></tr></thead><tbody>';
-    data.allRows.forEach((c, i) => {
-      html += '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(nameOf(c.anglerId)) + '</td><td>' + escapeHtml(c.species) + '</td>' +
-        '<td>' + (c.weight ? c.weight + ' g' : '—') + '</td><td>' + (c.length ? c.length + ' cm' : '—') + '</td>' +
-        '<td>' + fmtDate(c.date) + '</td></tr>';
-    });
-    html += '</tbody></table></div></div>';
 
     el.innerHTML = html;
   }
