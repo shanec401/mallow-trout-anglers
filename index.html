@@ -405,6 +405,7 @@
     <button class="tab-btn" data-tab="board">Leaderboard</button>
     <button class="tab-btn" data-tab="all">All catches</button>
     <button class="tab-btn" data-tab="comps">Competitions<span class="badge" id="compBadge" style="display:none;"></span></button>
+    <button class="tab-btn" data-tab="roster" id="rosterTabBtn" style="display:none;">Anglers</button>
     <button class="tab-btn" data-tab="settings" id="settingsTabBtn" style="display:none;">Settings</button>
   </nav>
 
@@ -473,10 +474,18 @@
 
   <section class="panel" id="panel-board">
     <div class="card" style="margin-bottom:16px;">
-      <label for="compSelectBoard">Standings for</label>
-      <select id="compSelectBoard">
-        <option value="">Overall club leaderboard</option>
-      </select>
+      <div class="field-row">
+        <div class="field" style="margin-bottom:0;">
+          <label for="compSelectBoard">Standings for</label>
+          <select id="compSelectBoard">
+            <option value="">Overall club leaderboard</option>
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:0;">
+          <label for="boardYearFilter">Year</label>
+          <select id="boardYearFilter"></select>
+        </div>
+      </div>
     </div>
     <div id="boardContent"></div>
   </section>
@@ -491,8 +500,78 @@
   <section class="panel" id="panel-comps">
     <div id="adminNewComp"></div>
     <div class="card">
-      <h2 class="section-title">Competitions</h2>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+        <h2 class="section-title" style="margin:0;">Competitions</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label for="compsYearFilter" style="font-size:0.8rem;color:var(--text-soft);font-weight:600;margin:0;">Year</label>
+          <select id="compsYearFilter" style="width:auto;"></select>
+        </div>
+      </div>
       <div id="compsContent"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="panel-roster">
+    <div class="card">
+      <h2 class="section-title" id="rosterFormTitle">Add an angler</h2>
+      <form id="rosterForm">
+        <div class="field-row">
+          <div class="field"><label for="rFirstName">First name</label><input type="text" id="rFirstName" required></div>
+          <div class="field"><label for="rSurname">Surname</label><input type="text" id="rSurname" required></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="rEmail">Email</label><input type="email" id="rEmail" required></div>
+          <div class="field"><label for="rPhone">Phone</label><input type="tel" id="rPhone" required></div>
+        </div>
+        <div class="field-row">
+          <div class="field"><label for="rLocation">Location</label><input type="text" id="rLocation" required></div>
+          <div class="field"><label for="rMembership">Membership</label><input type="text" id="rMembership" required placeholder="e.g. membership no."></div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="rYear">Year</label>
+            <select id="rYear" required></select>
+          </div>
+          <div class="field">
+            <label for="rFeesPaid">Fee's paid</label>
+            <select id="rFeesPaid" required>
+              <option value="">Select…</option>
+              <option value="Yes">Yes</option>
+              <option value="No">No</option>
+            </select>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="rFeesType">Fees type</label>
+            <select id="rFeesType" required>
+              <option value="">Select…</option>
+              <option value="Full">Full</option>
+              <option value="Associate">Associate</option>
+              <option value="OAP">OAP</option>
+              <option value="Juvenile">Juvenile</option>
+            </select>
+          </div>
+          <div class="field"></div>
+        </div>
+        <div class="field full">
+          <label for="rNotes">Notes</label>
+          <textarea id="rNotes" placeholder="Optional"></textarea>
+        </div>
+        <button type="submit" class="submit-btn" id="rosterSubmitBtn">Add angler</button>
+        <button type="button" class="ghost-btn deny-btn" id="rosterCancelEditBtn" style="display:none;margin-left:8px;">Cancel edit</button>
+        <div class="status-msg" id="rosterFormStatus"></div>
+      </form>
+    </div>
+    <div class="card">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;">
+        <h2 class="section-title" style="margin:0;">Anglers (<span id="rosterCount">0</span>)</h2>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <label for="rosterYearFilter" style="font-size:0.8rem;color:var(--text-soft);font-weight:600;margin:0;">Year</label>
+          <select id="rosterYearFilter" style="width:auto;"></select>
+        </div>
+      </div>
+      <div id="rosterContent"></div>
     </div>
   </section>
 
@@ -548,6 +627,25 @@
 
   $('#date').value = new Date().toISOString().slice(0, 10);
 
+  const YEAR_RANGE = { start: 2026, end: 2050 };
+  function currentDefaultYear() {
+    return Math.min(Math.max(new Date().getFullYear(), YEAR_RANGE.start), YEAR_RANGE.end);
+  }
+  function fillYearSelect(selectEl, includeAll) {
+    const defaultYear = currentDefaultYear();
+    let opts = includeAll ? '<option value="all">All years</option>' : '';
+    for (let y = YEAR_RANGE.start; y <= YEAR_RANGE.end; y++) {
+      opts += '<option value="' + y + '"' + (y === defaultYear ? ' selected' : '') + '>' + y + '</option>';
+    }
+    selectEl.innerHTML = opts;
+  }
+  (function populateYearSelects() {
+    fillYearSelect($('#rYear'), false);
+    fillYearSelect($('#rosterYearFilter'), true);
+    fillYearSelect($('#boardYearFilter'), true);
+    fillYearSelect($('#compsYearFilter'), true);
+  })();
+
   function escapeHtml(str) {
     return String(str == null ? '' : str).replace(/[&<>"']/g, c => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -575,8 +673,9 @@
   // ---- state ----
   let myId = null, myName = '', isAdmin = false;
   let adminIds = new Set();
-  let catches = [], competitions = [], registrations = [];
+  let catches = [], competitions = [], registrations = [], roster = [];
   let selectedPhotoFile = null;
+  let editingRosterId = null;
 
   // Names are no longer looked up live (no server-side profile directory
   // outside Claude), so we denormalize: each catch/registration carries the
@@ -621,18 +720,22 @@
   function render() {
     $('#whoamiTag').textContent = isAdmin ? 'Admin' : 'Member';
     $('#settingsTabBtn').style.display = isAdmin ? '' : 'none';
-    if (!isAdmin && document.querySelector('.tab-btn[data-tab="settings"]').classList.contains('active')) {
-      document.querySelector('.tab-btn[data-tab="settings"]').classList.remove('active');
-      document.querySelector('.tab-btn[data-tab="log"]').classList.add('active');
-      $('#panel-settings').classList.remove('active');
-      $('#panel-log').classList.add('active');
-    }
+    $('#rosterTabBtn').style.display = isAdmin ? '' : 'none';
+    ['settings', 'roster'].forEach(tab => {
+      if (!isAdmin && document.querySelector('.tab-btn[data-tab="' + tab + '"]').classList.contains('active')) {
+        document.querySelector('.tab-btn[data-tab="' + tab + '"]').classList.remove('active');
+        document.querySelector('.tab-btn[data-tab="log"]').classList.add('active');
+        $('#panel-' + tab).classList.remove('active');
+        $('#panel-log').classList.add('active');
+      }
+    });
     renderLogForm();
     renderBoardSelector();
     renderBoard();
     renderAll();
     renderComps();
     renderSettings();
+    renderRoster();
   }
 
   function renderLogForm() {
@@ -656,8 +759,9 @@
     if (opts.some(c => c.id === current)) sel.value = current;
   }
 
-  function computeBoard(filterCompId) {
+  function computeBoard(filterCompId, filterYear) {
     let set = visibleCatches();
+    if (filterYear && filterYear !== 'all') set = set.filter(c => c.date && c.date.slice(0, 4) === String(filterYear));
     if (filterCompId) set = set.filter(c => c.competitionId === filterCompId);
 
     const withWeight = set.filter(c => typeof c.weight === 'number' && c.weight > 0);
@@ -709,10 +813,12 @@
   function renderBoard() {
     const el = $('#boardContent');
     const filterCompId = $('#compSelectBoard').value || '';
-    const data = computeBoard(filterCompId);
+    const filterYear = $('#boardYearFilter').value || 'all';
+    const data = computeBoard(filterCompId, filterYear);
 
     if (!data.set.length) {
-      el.innerHTML = '<div class="card"><div class="empty-state"><div class="icon">🐟</div>No catches logged here yet.</div></div>';
+      const msg = filterYear !== 'all' ? 'No catches logged for ' + escapeHtml(filterYear) + ' here yet.' : 'No catches logged here yet.';
+      el.innerHTML = '<div class="card"><div class="empty-state"><div class="icon">🐟</div>' + msg + '</div></div>';
       return;
     }
 
@@ -836,7 +942,17 @@
       return;
     }
 
-    const sorted = competitions.slice().sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+    const yearFilter = $('#compsYearFilter').value || 'all';
+    const yearFiltered = yearFilter === 'all'
+      ? competitions
+      : competitions.filter(c => c.startDate && c.startDate.slice(0, 4) === String(yearFilter));
+
+    if (!yearFiltered.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🏆</div>No competitions starting in ' + escapeHtml(yearFilter) + '.</div>';
+      return;
+    }
+
+    const sorted = yearFiltered.slice().sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
     let html = '';
     sorted.forEach(c => {
       const mine = myRegFor(c.id);
@@ -941,6 +1057,138 @@
     $$('.admin-toggle-btn', el).forEach(btn => {
       btn.addEventListener('click', () => toggleAdmin(btn.dataset.id, btn.dataset.make === '1', btn));
     });
+  }
+
+  function renderRoster() {
+    if (!isAdmin) return;
+    const yearFilter = $('#rosterYearFilter').value || 'all';
+    const filtered = yearFilter === 'all' ? roster : roster.filter(r => String(r.year) === String(yearFilter));
+    $('#rosterCount').textContent = filtered.length;
+    const el = $('#rosterContent');
+    if (!filtered.length) {
+      el.innerHTML = '<div class="empty-state"><div class="icon">🎣</div>' +
+        (roster.length ? 'No anglers recorded for ' + escapeHtml(yearFilter) + '.' : 'No anglers added yet.') +
+        '</div>';
+      return;
+    }
+    const sorted = filtered.slice().sort((a, b) =>
+      (a.surname || '').localeCompare(b.surname || '') || (a.firstName || '').localeCompare(b.firstName || '')
+    );
+    let html = '<div class="table-scroll"><table><thead><tr>' +
+      '<th>Name</th><th>Email</th><th>Phone</th><th>Location</th><th>Membership</th><th>Year</th>' +
+      '<th>Fee\'s paid</th><th>Fees type</th><th>Notes</th><th></th>' +
+      '</tr></thead><tbody>';
+    sorted.forEach(r => {
+      const paidPill = r.feesPaid === 'Yes'
+        ? '<span class="pill approved">Yes</span>'
+        : '<span class="pill denied">No</span>';
+      html += '<tr>' +
+        '<td>' + escapeHtml(r.firstName) + ' ' + escapeHtml(r.surname) + '</td>' +
+        '<td>' + escapeHtml(r.email) + '</td>' +
+        '<td>' + escapeHtml(r.phone) + '</td>' +
+        '<td>' + escapeHtml(r.location) + '</td>' +
+        '<td>' + escapeHtml(r.membership) + '</td>' +
+        '<td>' + escapeHtml(r.year) + '</td>' +
+        '<td>' + paidPill + '</td>' +
+        '<td>' + escapeHtml(r.feesType) + '</td>' +
+        '<td>' + (r.notes ? escapeHtml(r.notes) : '—') + '</td>' +
+        '<td style="white-space:nowrap;">' +
+          '<button class="del-btn roster-edit-btn" data-id="' + escapeHtml(r.id) + '">edit</button>' +
+          ' · <button class="del-btn roster-del-btn" data-id="' + escapeHtml(r.id) + '">remove</button>' +
+        '</td>' +
+      '</tr>';
+    });
+    html += '</tbody></table></div>';
+    el.innerHTML = html;
+
+    $$('.roster-edit-btn', el).forEach(btn => btn.addEventListener('click', () => startEditRoster(btn.dataset.id)));
+    $$('.roster-del-btn', el).forEach(btn => btn.addEventListener('click', () => onDeleteRosterEntry(btn.dataset.id)));
+  }
+
+  function startEditRoster(id) {
+    const r = roster.find(x => x.id === id);
+    if (!r) return;
+    editingRosterId = id;
+    $('#rFirstName').value = r.firstName || '';
+    $('#rSurname').value = r.surname || '';
+    $('#rEmail').value = r.email || '';
+    $('#rPhone').value = r.phone || '';
+    $('#rLocation').value = r.location || '';
+    $('#rMembership').value = r.membership || '';
+    $('#rYear').value = r.year || '';
+    $('#rFeesPaid').value = r.feesPaid || '';
+    $('#rFeesType').value = r.feesType || '';
+    $('#rNotes').value = r.notes || '';
+    $('#rosterFormTitle').textContent = 'Edit angler';
+    $('#rosterSubmitBtn').textContent = 'Save changes';
+    $('#rosterCancelEditBtn').style.display = 'inline-block';
+    $('#rosterFormStatus').textContent = '';
+    $('#rosterForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function resetRosterForm() {
+    editingRosterId = null;
+    $('#rosterForm').reset();
+    $('#rosterFormTitle').textContent = 'Add an angler';
+    $('#rosterSubmitBtn').textContent = 'Add angler';
+    $('#rosterCancelEditBtn').style.display = 'none';
+  }
+
+  $('#rosterCancelEditBtn').addEventListener('click', resetRosterForm);
+  $('#rosterYearFilter').addEventListener('change', renderRoster);
+
+  $('#rosterForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const statusEl = $('#rosterFormStatus');
+    const data = {
+      firstName: $('#rFirstName').value.trim(),
+      surname: $('#rSurname').value.trim(),
+      email: $('#rEmail').value.trim(),
+      phone: $('#rPhone').value.trim(),
+      location: $('#rLocation').value.trim(),
+      membership: $('#rMembership').value.trim(),
+      year: $('#rYear').value,
+      feesPaid: $('#rFeesPaid').value,
+      feesType: $('#rFeesType').value,
+      notes: $('#rNotes').value.trim() || null
+    };
+    if (!data.firstName || !data.surname || !data.email || !data.phone || !data.location || !data.membership || !data.year || !data.feesPaid || !data.feesType) {
+      statusEl.textContent = 'Please fill in every field except Notes.';
+      statusEl.className = 'status-msg err';
+      return;
+    }
+    const btn = $('#rosterSubmitBtn');
+    btn.disabled = true;
+    statusEl.textContent = 'Saving…';
+    statusEl.className = 'status-msg';
+    try {
+      if (editingRosterId) {
+        await db.collection('roster').doc(editingRosterId).update(data);
+        statusEl.textContent = 'Angler updated.';
+      } else {
+        data.createdBy = myId;
+        data.createdAt = Date.now();
+        await db.collection('roster').add(data);
+        statusEl.textContent = 'Angler added.';
+      }
+      statusEl.className = 'status-msg ok';
+      resetRosterForm();
+    } catch (err) {
+      statusEl.textContent = 'Could not save that entry. Please try again.';
+      statusEl.className = 'status-msg err';
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  async function onDeleteRosterEntry(id) {
+    const r = roster.find(x => x.id === id);
+    const ok = window.confirm('Remove ' + (r ? r.firstName + ' ' + r.surname : 'this angler') + ' from the roster? This can\'t be undone.');
+    if (!ok) return;
+    try {
+      await db.collection('roster').doc(id).delete();
+      if (editingRosterId === id) resetRosterForm();
+    } catch (e) {}
   }
 
   async function toggleAdmin(id, makeAdmin, btn) {
@@ -1050,6 +1298,8 @@
   });
 
   $('#compSelectBoard').addEventListener('change', renderBoard);
+  $('#boardYearFilter').addEventListener('change', renderBoard);
+  $('#compsYearFilter').addEventListener('change', renderComps);
 
   $('#catchForm').addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -1220,6 +1470,12 @@
     ));
     unsubscribers.push(db.collection('admins').limit(200).onSnapshot(
       (snap) => { adminIds = new Set(snap.docs.map(d => d.id)); isAdmin = adminIds.has(myId); render(); },
+      (err) => {}
+    ));
+    // Only admins can actually read this collection per the Firestore rules,
+    // so for everyone else this quietly does nothing.
+    unsubscribers.push(db.collection('roster').limit(1000).onSnapshot(
+      (snap) => { roster = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); },
       (err) => {}
     ));
 
