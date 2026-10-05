@@ -682,7 +682,15 @@
     });
     const speciesRows = Object.values(bySpecies).sort((a, b) => b.weight - a.weight);
 
-    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows };
+    // Every catch in this view, ranked — heaviest first, then longest,
+    // then most recent for anything with no weight or length logged.
+    const allRows = set.slice().sort((a, b) =>
+      (b.weight || -1) - (a.weight || -1) ||
+      (b.length || -1) - (a.length || -1) ||
+      (b.createdAt || 0) - (a.createdAt || 0)
+    );
+
+    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, allRows };
   }
 
   function renderBoard() {
@@ -717,6 +725,16 @@
       html += '<div class="empty-state">Log a weight to start the species board.</div>';
     }
     html += '</div>';
+
+    html += '<div class="card"><h3 class="sub-title">All catches ranked (' + data.allRows.length + ')</h3>';
+    html += '<div class="table-scroll"><table><thead><tr><th>#</th><th>Angler</th><th>Species</th><th>Weight</th><th>Length</th><th>Date</th></tr></thead><tbody>';
+    data.allRows.forEach((c, i) => {
+      html += '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(nameOf(c.anglerId)) + '</td><td>' + escapeHtml(c.species) + '</td>' +
+        '<td>' + (c.weight ? c.weight + ' g' : '—') + '</td><td>' + (c.length ? c.length + ' cm' : '—') + '</td>' +
+        '<td>' + fmtDate(c.date) + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+
     el.innerHTML = html;
   }
 
