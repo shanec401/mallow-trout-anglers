@@ -690,6 +690,7 @@
   let catches = [], competitions = [], registrations = [], roster = [];
   let selectedPhotoFile = null;
   let editingRosterId = null;
+  let editingCompId = null;
 
   // Names are no longer looked up live (no server-side profile directory
   // outside Claude), so we denormalize: each catch/registration carries the
@@ -929,30 +930,36 @@
 
     const adminWrap = $('#adminNewComp');
     if (isAdmin) {
+      const editing = editingCompId ? competitions.find(c => c.id === editingCompId) : null;
+      // If the competition being edited just got deleted elsewhere, fall back to "new" mode.
+      if (editingCompId && !editing) editingCompId = null;
+
       adminWrap.innerHTML = '<div class="card">' +
-        '<h2 class="section-title">New competition</h2>' +
+        '<h2 class="section-title">' + (editing ? 'Edit competition' : 'New competition') + '</h2>' +
         '<form id="newCompForm">' +
           '<div class="field-row">' +
-            '<div class="field"><label for="ncName">Name</label><input type="text" id="ncName" required placeholder="e.g. Autumn Open"></div>' +
-            '<div class="field"><label for="ncLocation">Location (optional)</label><input type="text" id="ncLocation" placeholder="e.g. North Reservoir"></div>' +
+            '<div class="field"><label for="ncName">Name</label><input type="text" id="ncName" required placeholder="e.g. Autumn Open" value="' + (editing ? escapeHtml(editing.name) : '') + '"></div>' +
+            '<div class="field"><label for="ncLocation">Location (optional)</label><input type="text" id="ncLocation" placeholder="e.g. North Reservoir" value="' + (editing && editing.location ? escapeHtml(editing.location) : '') + '"></div>' +
           '</div>' +
           '<div class="field-row">' +
-            '<div class="field"><label for="ncStart">Start date</label><input type="date" id="ncStart" required></div>' +
-            '<div class="field"><label for="ncEnd">End date</label><input type="date" id="ncEnd" required></div>' +
+            '<div class="field"><label for="ncStart">Start date</label><input type="date" id="ncStart" required value="' + (editing ? escapeHtml(editing.startDate) : '') + '"></div>' +
+            '<div class="field"><label for="ncEnd">End date</label><input type="date" id="ncEnd" required value="' + (editing ? escapeHtml(editing.endDate) : '') + '"></div>' +
           '</div>' +
           '<div class="field full">' +
             '<label for="ncCup">Cup (optional)</label>' +
             '<select id="ncCup">' +
               '<option value="">No cup</option>' +
-              CUP_OPTIONS.map(c => '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>').join('') +
+              CUP_OPTIONS.map(c => '<option value="' + escapeHtml(c) + '"' + (editing && editing.cup === c ? ' selected' : '') + '>' + escapeHtml(c) + '</option>').join('') +
             '</select>' +
           '</div>' +
-          '<div class="field full"><label for="ncDesc">Description (optional)</label><textarea id="ncDesc" placeholder="Rules, prizes, anything members should know"></textarea></div>' +
-          '<button type="submit" class="submit-btn">Create competition</button>' +
+          '<div class="field full"><label for="ncDesc">Description (optional)</label><textarea id="ncDesc" placeholder="Rules, prizes, anything members should know">' + (editing && editing.description ? escapeHtml(editing.description) : '') + '</textarea></div>' +
+          '<button type="submit" class="submit-btn" id="ncSubmitBtn">' + (editing ? 'Save changes' : 'Create competition') + '</button>' +
+          (editing ? ' <button type="button" class="ghost-btn deny-btn" id="ncCancelEditBtn" style="margin-left:8px;">Cancel edit</button>' : '') +
           '<div class="status-msg" id="ncStatus"></div>' +
         '</form>' +
       '</div>';
-      $('#newCompForm').addEventListener('submit', onCreateCompetition);
+      $('#newCompForm').addEventListener('submit', onSubmitCompetitionForm);
+      if (editing) $('#ncCancelEditBtn').addEventListener('click', () => { editingCompId = null; renderComps(); });
     } else {
       adminWrap.innerHTML = '';
     }
@@ -1000,7 +1007,8 @@
         const pending = regsForComp.filter(r => r.status === 'pending');
         const approvedCount = regsForComp.filter(r => r.status === 'approved').length;
         html += '<div class="admin-block"><div class="admin-label">Admin · ' + approvedCount + ' approved' +
-          '<button class="ghost-btn deny-btn del-comp-btn" data-comp="' + escapeHtml(c.id) + '" data-name="' + escapeHtml(c.name) + '" style="margin-left:10px;padding:3px 10px;font-size:0.7rem;">Delete competition</button>' +
+          '<button class="ghost-btn edit-comp-btn" data-comp="' + escapeHtml(c.id) + '" style="margin-left:10px;padding:3px 10px;font-size:0.7rem;">Edit</button>' +
+          '<button class="ghost-btn deny-btn del-comp-btn" data-comp="' + escapeHtml(c.id) + '" data-name="' + escapeHtml(c.name) + '" style="margin-left:6px;padding:3px 10px;font-size:0.7rem;">Delete competition</button>' +
         '</div>';
         if (pending.length) {
           pending.forEach(r => {
@@ -1024,6 +1032,11 @@
     $$('.approve-btn', el).forEach(btn => btn.addEventListener('click', () => onDecide(btn.dataset.comp, btn.dataset.angler, 'approved', btn)));
     $$('.deny-action-btn', el).forEach(btn => btn.addEventListener('click', () => onDecide(btn.dataset.comp, btn.dataset.angler, 'denied', btn)));
     $$('.del-comp-btn', el).forEach(btn => btn.addEventListener('click', () => onDeleteCompetition(btn.dataset.comp, btn.dataset.name, btn)));
+    $$('.edit-comp-btn', el).forEach(btn => btn.addEventListener('click', () => {
+      editingCompId = btn.dataset.comp;
+      renderComps();
+      $('#adminNewComp').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }));
   }
 
   function renderSettings() {
@@ -1270,7 +1283,7 @@
     }
   }
 
-  async function onCreateCompetition(e) {
+  async function onSubmitCompetitionForm(e) {
     e.preventDefault();
     const name = $('#ncName').value.trim();
     const location = $('#ncLocation').value.trim();
@@ -1284,20 +1297,27 @@
       statusEl.className = 'status-msg err';
       return;
     }
-    const btn = e.target.querySelector('button[type="submit"]');
+    const isEditing = !!editingCompId;
+    const btn = $('#ncSubmitBtn');
     btn.disabled = true;
-    statusEl.textContent = 'Creating…';
+    statusEl.textContent = isEditing ? 'Saving…' : 'Creating…';
     statusEl.className = 'status-msg';
     try {
-      await db.collection('competitions').add({
-        name, location: location || null, startDate, endDate, cup: cup || null, description: description || null,
-        createdBy: myId, createdAt: Date.now()
-      });
-      statusEl.textContent = 'Competition created.';
+      const data = { name, location: location || null, startDate, endDate, cup: cup || null, description: description || null };
+      if (isEditing) {
+        await db.collection('competitions').doc(editingCompId).update(data);
+        statusEl.textContent = 'Competition updated.';
+        editingCompId = null;
+      } else {
+        data.createdBy = myId;
+        data.createdAt = Date.now();
+        await db.collection('competitions').add(data);
+        statusEl.textContent = 'Competition created.';
+        e.target.reset();
+      }
       statusEl.className = 'status-msg ok';
-      e.target.reset();
     } catch (err) {
-      statusEl.textContent = 'Could not create that competition.';
+      statusEl.textContent = isEditing ? 'Could not save those changes.' : 'Could not create that competition.';
       statusEl.className = 'status-msg err';
     } finally {
       btn.disabled = false;
