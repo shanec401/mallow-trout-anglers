@@ -627,6 +627,20 @@
 
   $('#date').value = new Date().toISOString().slice(0, 10);
 
+  const CUP_OPTIONS = [
+    "Timmy Lyones Cup",
+    "Nellie Willies Cup",
+    "Jackie Bloster Cup",
+    "the dick willis Cup",
+    "Christy O'Connell Cup",
+    "The Dermout Casey Cup",
+    "The ORuroke Cup",
+    "the bridge house Cup",
+    "the david willis Cup",
+    "the dick willis perpetual Trophy",
+    "Bredan Barton Cup"
+  ];
+
   const YEAR_RANGE = { start: 2026, end: 2050 };
   function currentDefaultYear() {
     return Math.min(Math.max(new Date().getFullYear(), YEAR_RANGE.start), YEAR_RANGE.end);
@@ -926,6 +940,13 @@
             '<div class="field"><label for="ncStart">Start date</label><input type="date" id="ncStart" required></div>' +
             '<div class="field"><label for="ncEnd">End date</label><input type="date" id="ncEnd" required></div>' +
           '</div>' +
+          '<div class="field full">' +
+            '<label for="ncCup">Cup (optional)</label>' +
+            '<select id="ncCup">' +
+              '<option value="">No cup</option>' +
+              CUP_OPTIONS.map(c => '<option value="' + escapeHtml(c) + '">' + escapeHtml(c) + '</option>').join('') +
+            '</select>' +
+          '</div>' +
           '<div class="field full"><label for="ncDesc">Description (optional)</label><textarea id="ncDesc" placeholder="Rules, prizes, anything members should know"></textarea></div>' +
           '<button type="submit" class="submit-btn">Create competition</button>' +
           '<div class="status-msg" id="ncStatus"></div>' +
@@ -963,7 +984,9 @@
       html += '<div class="comp-item">' +
         '<div class="comp-head">' +
           '<div><h3>' + escapeHtml(c.name) + '</h3>' +
-          '<div class="dates">' + fmtDate(c.startDate) + ' – ' + fmtDate(c.endDate) + (c.location ? ' · ' + escapeHtml(c.location) : '') + '</div></div>' +
+          '<div class="dates">' + fmtDate(c.startDate) + ' – ' + fmtDate(c.endDate) + (c.location ? ' · ' + escapeHtml(c.location) : '') + '</div>' +
+          (c.cup ? '<div style="margin-top:4px;"><span class="comp-tag">🏆 ' + escapeHtml(c.cup) + '</span></div>' : '') +
+          '</div>' +
           pill +
         '</div>' +
         (c.description ? '<div class="desc">' + escapeHtml(c.description) + '</div>' : '');
@@ -1253,6 +1276,7 @@
     const location = $('#ncLocation').value.trim();
     const startDate = $('#ncStart').value;
     const endDate = $('#ncEnd').value;
+    const cup = $('#ncCup').value || null;
     const description = $('#ncDesc').value.trim();
     const statusEl = $('#ncStatus');
     if (!name || !startDate || !endDate) {
@@ -1266,7 +1290,7 @@
     statusEl.className = 'status-msg';
     try {
       await db.collection('competitions').add({
-        name, location: location || null, startDate, endDate, description: description || null,
+        name, location: location || null, startDate, endDate, cup: cup || null, description: description || null,
         createdBy: myId, createdAt: Date.now()
       });
       statusEl.textContent = 'Competition created.';
