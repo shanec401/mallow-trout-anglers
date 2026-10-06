@@ -420,6 +420,10 @@
     <div class="card">
       <h2 class="section-title">Log a catch</h2>
       <form id="catchForm">
+        <div class="field full" id="onBehalfWrap" style="display:none;">
+          <label for="logOnBehalfOf">Log on behalf of</label>
+          <select id="logOnBehalfOf"></select>
+        </div>
         <div class="field-row">
           <div class="field">
             <label for="species">Species</label>
@@ -764,12 +768,18 @@
     return 'A club member';
   }
 
+  function regFor(anglerId, compId) {
+    return registrations.find(r => r.competitionId === compId && r.anglerId === anglerId) || null;
+  }
   function myRegFor(compId) {
-    return registrations.find(r => r.competitionId === compId && r.anglerId === myId) || null;
+    return regFor(myId, compId);
+  }
+  function approvedCompsFor(anglerId) {
+    const approvedIds = new Set(registrations.filter(r => r.anglerId === anglerId && r.status === 'approved').map(r => r.competitionId));
+    return competitions.filter(c => approvedIds.has(c.id));
   }
   function approvedCompsForMe() {
-    const approvedIds = new Set(registrations.filter(r => r.anglerId === myId && r.status === 'approved').map(r => r.competitionId));
-    return competitions.filter(c => approvedIds.has(c.id));
+    return approvedCompsFor(myId);
   }
   function visibleCompsForBoard() {
     if (isAdmin) return competitions;
@@ -811,10 +821,43 @@
     renderRoster();
   }
 
+  // Every angler id we know of — anyone who has ever logged a catch or
+  // registered for a competition — for the admin's "log on behalf of" list.
+  function allKnownAnglerIds() {
+    const idSet = new Set();
+    catches.forEach(c => c.anglerId && idSet.add(c.anglerId));
+    registrations.forEach(r => r.anglerId && idSet.add(r.anglerId));
+    if (myId) idSet.add(myId);
+    return Array.from(idSet);
+  }
+
+  function getLogTargetAnglerId() {
+    if (isAdmin) {
+      const sel = $('#logOnBehalfOf');
+      if (sel && sel.value) return sel.value;
+    }
+    return myId;
+  }
+
+  function renderOnBehalfSelector() {
+    const wrap = $('#onBehalfWrap');
+    if (!isAdmin) { wrap.style.display = 'none'; return; }
+    const others = allKnownAnglerIds().filter(id => id !== myId).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+    if (!others.length) { wrap.style.display = 'none'; return; }
+    wrap.style.display = 'block';
+    const sel = $('#logOnBehalfOf');
+    const current = sel.value;
+    sel.innerHTML = '<option value="' + escapeHtml(myId) + '">Myself (' + escapeHtml(myName) + ')</option>' +
+      others.map(id => '<option value="' + escapeHtml(id) + '">' + escapeHtml(nameOf(id)) + '</option>').join('');
+    sel.value = (current && (current === myId || others.includes(current))) ? current : myId;
+  }
+
   function renderLogForm() {
+    renderOnBehalfSelector();
+    const targetAnglerId = getLogTargetAnglerId();
     const wrap = $('#compFieldWrap');
     const sel = $('#catchCompetition');
-    const mine = approvedCompsForMe();
+    const mine = approvedCompsFor(targetAnglerId);
     if (!mine.length) { wrap.style.display = 'none'; return; }
     wrap.style.display = 'block';
     const current = sel.value;
@@ -960,7 +1003,8 @@
             '<div class="who">' + escapeHtml(angler) + ' <span class="species">— ' + escapeHtml(c.species) + '</span>' +
               (c.competitionId && compNameById[c.competitionId] ? '<span class="comp-tag">' + escapeHtml(compNameById[c.competitionId]) + '</span>' : '') +
             '</div>' +
-            '<div class="meta">' + fmtDate(c.date) + (c.location ? ' · ' + escapeHtml(c.location) : '') + (c.notes ? ' · ' + escapeHtml(c.notes) : '') + '</div>' +
+            '<div class="meta">' + fmtDate(c.date) + (c.location ? ' · ' + escapeHtml(c.location) : '') + (c.notes ? ' · ' + escapeHtml(c.notes) : '') +
+              (c.loggedByAdminName ? ' · logged by ' + escapeHtml(c.loggedByAdminName) : '') + '</div>' +
           '</div>' +
         '</div>' +
         '<div class="measures">' + measures +
@@ -1497,6 +1541,7 @@
     $('#photoBtnLabel').style.display = 'inline-flex';
   });
 
+  $('#logOnBehalfOf').addEventListener('change', renderLogForm);
   $('#compSelectBoard').addEventListener('change', renderBoard);
   $('#boardYearFilter').addEventListener('change', renderBoard);
   $('#boardExportBtn').addEventListener('click', () => {
@@ -1529,6 +1574,9 @@
     const location = $('#location').value.trim();
     const notes = $('#notes').value.trim();
     const competitionId = $('#compFieldWrap').style.display !== 'none' ? ($('#catchCompetition').value || null) : null;
+    const targetAnglerId = getLogTargetAnglerId();
+    const targetAnglerName = targetAnglerId === myId ? myName : nameOf(targetAnglerId);
+    const loggingForSomeoneElse = targetAnglerId !== myId;
 
     if (!species || !date) {
       setFormStatus('Species and date are required.', 'err');
@@ -1549,9 +1597,11 @@
       return;
     }
     if (competitionId) {
-      const reg = myRegFor(competitionId);
+      const reg = regFor(targetAnglerId, competitionId);
       if (!reg || reg.status !== 'approved') {
-        setFormStatus("You're not approved for that competition yet, so this catch can't be tagged to it.", 'err');
+        setFormStatus(loggingForSomeoneElse
+          ? (targetAnglerName + " isn't approved for that competition yet, so this catch can't be tagged to it.")
+          : "You're not approved for that competition yet, so this catch can't be tagged to it.", 'err');
         renderLogForm();
         return;
       }
@@ -1574,9 +1624,9 @@
         }
       }
 
-      await db.collection('catches').add({
-        anglerId: myId,
-        angler: myName,
+      const catchData = {
+        anglerId: targetAnglerId,
+        angler: targetAnglerName,
         species: species,
         weight: weightRaw ? Math.round(parseFloat(weightRaw)) : null,
         length: lengthRaw ? Math.round(parseFloat(lengthRaw) * 10) / 10 : null,
@@ -1586,9 +1636,18 @@
         photoURL: photoURL,
         competitionId: competitionId,
         createdAt: Date.now()
-      });
+      };
+      if (loggingForSomeoneElse) {
+        catchData.loggedByAdminId = myId;
+        catchData.loggedByAdminName = myName;
+      }
+      await db.collection('catches').add(catchData);
 
-      setFormStatus(photoURL || !selectedPhotoFile ? 'Catch logged. Nice one!' : 'Catch logged (photo could not be uploaded).', 'ok');
+      setFormStatus(
+        (loggingForSomeoneElse ? 'Catch logged for ' + targetAnglerName + '. ' : 'Catch logged. ') +
+        (photoURL || !selectedPhotoFile ? 'Nice one!' : '(photo could not be uploaded)'),
+        'ok'
+      );
       $('#species').value = ''; $('#weight').value = ''; $('#length').value = '';
       $('#location').value = ''; $('#notes').value = '';
       selectedPhotoFile = null;
