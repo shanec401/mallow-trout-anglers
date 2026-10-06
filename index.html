@@ -1701,13 +1701,35 @@
     unsubscribers = [];
   }
 
+  // ---- auto sign-out after inactivity ----
+  const IDLE_LIMIT_MS = 20 * 60 * 1000; // 20 minutes
+  let idleTimer = null;
+  let loggedOutForIdle = false;
+
+  function resetIdleTimer() {
+    if (!myId) return; // nobody signed in, nothing to time out
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => {
+      loggedOutForIdle = true;
+      auth.signOut();
+    }, IDLE_LIMIT_MS);
+  }
+  ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll', 'click'].forEach(evt => {
+    window.addEventListener(evt, resetIdleTimer, { passive: true });
+  });
+
   auth.onAuthStateChanged(user => {
     teardownListeners();
     if (!user) {
+      clearTimeout(idleTimer);
       $('#loadingGate').style.display = 'none';
       $('#signinGate').style.display = 'flex';
       $('#appRoot').style.display = 'none';
       $('#whoami').style.display = 'none';
+      if (loggedOutForIdle) {
+        $('#signinStatus').textContent = "You were signed out after 20 minutes of inactivity. Sign back in to continue.";
+        loggedOutForIdle = false;
+      }
       return;
     }
 
@@ -1719,6 +1741,7 @@
     $('#whoami').style.display = 'flex';
     $('#whoamiName').textContent = myName;
     $('#whoamiAvatar').src = user.photoURL || '';
+    resetIdleTimer();
 
     unsubscribers.push(db.collection('catches').orderBy('date', 'desc').limit(500).onSnapshot(
       (snap) => { catches = snap.docs.map(d => Object.assign({ id: d.id }, d.data())); render(); },
