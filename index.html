@@ -228,6 +228,21 @@
   .comp-item h3 { margin: 0 0 4px; font-family: 'Bitter', serif; font-size: 1.05rem; }
   .comp-item .dates { font-size: 0.8rem; color: var(--text-soft); margin-bottom: 6px; }
   .comp-item .desc { font-size: 0.88rem; margin-top: 6px; }
+  .safety-notice {
+    margin-top: 10px; background: rgba(166, 60, 20, 0.08); border: 1px solid rgba(166, 60, 20, 0.3);
+    border-left: 4px solid var(--accent); border-radius: 8px; padding: 12px 14px;
+  }
+  .safety-notice summary {
+    cursor: pointer; font-weight: 700; font-size: 0.85rem; color: var(--accent);
+    list-style: none; display: flex; align-items: center; gap: 6px;
+  }
+  .safety-notice summary::-webkit-details-marker { display: none; }
+  .safety-notice summary::before { content: '▸'; display: inline-block; transition: transform 0.15s ease; }
+  .safety-notice[open] summary::before { transform: rotate(90deg); }
+  .safety-notice pre {
+    white-space: pre-wrap; font-family: 'Public Sans', sans-serif; font-size: 0.85rem;
+    margin: 10px 0 0; color: var(--text);
+  }
   .pill {
     display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.74rem; font-weight: 700;
   }
@@ -427,7 +442,7 @@
         <div class="field-row">
           <div class="field">
             <label for="species">Species</label>
-            <input type="text" id="species" required list="speciesList" placeholder="e.g. Pike">
+            <input type="text" id="species" required list="speciesList" placeholder="e.g. Pike" value="Trout">
             <datalist id="speciesList">
               <option value="Bass"></option><option value="Trout"></option><option value="Pike"></option>
               <option value="Perch"></option><option value="Carp"></option><option value="Tench"></option>
@@ -667,6 +682,38 @@
   });
 
   $('#date').value = new Date().toISOString().slice(0, 10);
+
+  const DEFAULT_SAFETY_NOTICE =
+`⚠️ SAFETY NOTICE ⚠️
+Anglers must use caution at all times while on the river.
+
+🚨 YOUTH SAFETY NOTICE 🚨
+Youth anglers must be accompanied by an adult or guardian at all times.
+
+Required: Life jacket, hat & sunglasses.
+
+📱 CATCH & RELEASE REQUIREMENTS
+• Catch & release competition
+• Phone capable of taking photos required
+• Fully charged phone strongly advised
+✅ Body waders are allowed
+
+🎣 FISH & PHOTOGRAPH RULES
+• Brown Trout over 20cm only (minimum size – measurement rounded up)
+• Photo must be taken of the fish exactly as it lies on the measure
+• Only correctly photographed fish will be counted
+❌ No screenshots or screen grabs — original photos only
+• Phones must be presented at weigh-in showing photos of fish caught
+• Official measures and ID tags supplied by Mallow Trout Anglers
+• Only official measures and ID tags will be accepted
+
+✅ Photo must clearly show:
+• Fish on the official measure with numbers visible
+• Official ID tag with date & number/letter clearly visible
+• Measurement clearly showing over 20cm
+• Fish measured from tip of nose to end of tail
+• Nose flush with the start of the measure (no gap)
+❌ No hands or other objects in the photo`;
 
   const CUP_OPTIONS = [
     "Timmy Lyones Cup",
@@ -1055,6 +1102,13 @@
             '</select>' +
           '</div>' +
           '<div class="field full"><label for="ncDesc">Description (optional)</label><textarea id="ncDesc" placeholder="Rules, prizes, anything members should know">' + (editing && editing.description ? escapeHtml(editing.description) : '') + '</textarea></div>' +
+          '<div class="field full">' +
+            '<label for="ncSafety">Health &amp; safety notice (optional)</label>' +
+            '<textarea id="ncSafety" rows="10" style="font-family:monospace;font-size:0.85rem;">' +
+              escapeHtml(editing ? (editing.safetyNotice || '') : DEFAULT_SAFETY_NOTICE) +
+            '</textarea>' +
+            '<p style="font-size:0.78rem;color:var(--text-soft);margin-top:4px;">Pre-filled with the club\'s standard notice — edit dates, species, or size limits as needed for this event, or clear it to show nothing.</p>' +
+          '</div>' +
           '<button type="submit" class="submit-btn" id="ncSubmitBtn">' + (editing ? 'Save changes' : 'Create competition') + '</button>' +
           (editing ? ' <button type="button" class="ghost-btn deny-btn" id="ncCancelEditBtn" style="margin-left:8px;">Cancel edit</button>' : '') +
           '<div class="status-msg" id="ncStatus"></div>' +
@@ -1098,7 +1152,8 @@
           '</div>' +
           pill +
         '</div>' +
-        (c.description ? '<div class="desc">' + escapeHtml(c.description) + '</div>' : '');
+        (c.description ? '<div class="desc">' + escapeHtml(c.description) + '</div>' : '') +
+        (c.safetyNotice ? '<details class="safety-notice" open><summary>⚠️ Health &amp; Safety Notice</summary><pre>' + escapeHtml(c.safetyNotice) + '</pre></details>' : '');
 
       if (!mine || mine.status === 'denied') {
         html += '<div style="margin-top:10px;"><button class="ghost-btn join-btn" data-comp="' + escapeHtml(c.id) + '">Request to join</button></div>';
@@ -1486,6 +1541,7 @@
     const endDate = $('#ncEnd').value;
     const cup = $('#ncCup').value || null;
     const description = $('#ncDesc').value.trim();
+    const safetyNotice = $('#ncSafety').value.trim();
     const statusEl = $('#ncStatus');
     if (!name || !startDate || !endDate) {
       statusEl.textContent = 'Name and both dates are required.';
@@ -1503,7 +1559,7 @@
     statusEl.textContent = isEditing ? 'Saving…' : 'Creating…';
     statusEl.className = 'status-msg';
     try {
-      const data = { name, location: location || null, startDate, endDate, cup: cup || null, description: description || null };
+      const data = { name, location: location || null, startDate, endDate, cup: cup || null, description: description || null, safetyNotice: safetyNotice || null };
       if (isEditing) {
         await db.collection('competitions').doc(editingCompId).update(data);
         statusEl.textContent = 'Competition updated.';
@@ -1648,7 +1704,7 @@
         (photoURL || !selectedPhotoFile ? 'Nice one!' : '(photo could not be uploaded)'),
         'ok'
       );
-      $('#species').value = ''; $('#weight').value = ''; $('#length').value = '';
+      $('#species').value = 'Trout'; $('#weight').value = ''; $('#length').value = '';
       $('#location').value = ''; $('#notes').value = '';
       selectedPhotoFile = null;
       $('#photoInput').value = '';
