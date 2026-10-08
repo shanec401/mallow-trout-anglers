@@ -566,7 +566,6 @@
         </div>
         <div class="field-row">
           <div class="field"><label for="rLocation">Location</label><input type="text" id="rLocation" required></div>
-          <div class="field"><label for="rMembership">Membership</label><input type="text" id="rMembership" required placeholder="e.g. membership no."></div>
         </div>
         <div class="field-row">
           <div class="field">
@@ -1386,30 +1385,8 @@ Required: Life jacket, hat & sunglasses.
     });
   }
 
-  // Looks at every membership number already in the roster, finds the
-  // highest, and suggests one more — keeping the same zero-padding width
-  // (e.g. existing "01", "02" suggests "03") if the existing ones use it.
-  function computeNextMembershipNumber() {
-    let maxNum = 0, padLength = 2;
-    roster.forEach(r => {
-      const digits = (r.membership || '').match(/\d+/);
-      if (digits) {
-        const num = parseInt(digits[0], 10);
-        if (num > maxNum) maxNum = num;
-        if (digits[0].length > padLength) padLength = digits[0].length;
-      }
-    });
-    return String(maxNum + 1).padStart(padLength, '0');
-  }
-
   function renderRoster() {
     if (!isAdmin) return;
-    // Only suggest a number while adding a new angler, and only if the
-    // field is still empty — never overwrite something already typed in,
-    // or anything being edited on an existing entry.
-    if (!editingRosterId && !$('#rMembership').value) {
-      $('#rMembership').value = computeNextMembershipNumber();
-    }
     const yearFilter = $('#rosterYearFilter').value || 'all';
     const filtered = yearFilter === 'all' ? roster : roster.filter(r => String(r.year) === String(yearFilter));
     $('#rosterCount').textContent = filtered.length;
@@ -1424,7 +1401,7 @@ Required: Life jacket, hat & sunglasses.
       (a.surname || '').localeCompare(b.surname || '') || (a.firstName || '').localeCompare(b.firstName || '')
     );
     let html = '<div class="table-scroll"><table><thead><tr>' +
-      '<th>Name</th><th>Email</th><th>Phone</th><th>Location</th><th>Membership</th><th>Year</th>' +
+      '<th>Name</th><th>Email</th><th>Phone</th><th>Location</th><th>Year</th>' +
       '<th>Fee\'s paid</th><th>Fees type</th><th>Position</th><th>Account</th><th>Notes</th><th></th>' +
       '</tr></thead><tbody>';
     sorted.forEach(r => {
@@ -1439,7 +1416,6 @@ Required: Life jacket, hat & sunglasses.
         '<td>' + escapeHtml(r.email) + '</td>' +
         '<td>' + escapeHtml(r.phone) + '</td>' +
         '<td>' + escapeHtml(r.location) + '</td>' +
-        '<td>' + escapeHtml(r.membership) + '</td>' +
         '<td>' + escapeHtml(r.year) + '</td>' +
         '<td>' + paidPill + '</td>' +
         '<td>' + escapeHtml(r.feesType) + '</td>' +
@@ -1468,7 +1444,6 @@ Required: Life jacket, hat & sunglasses.
     $('#rEmail').value = r.email || '';
     $('#rPhone').value = r.phone || '';
     $('#rLocation').value = r.location || '';
-    $('#rMembership').value = r.membership || '';
     $('#rPosition').value = r.position || '';
     $('#rYear').value = r.year || '';
     $('#rFeesPaid').value = r.feesPaid || '';
@@ -1501,14 +1476,13 @@ Required: Life jacket, hat & sunglasses.
       email: $('#rEmail').value.trim(),
       phone: $('#rPhone').value.trim(),
       location: $('#rLocation').value.trim(),
-      membership: $('#rMembership').value.trim(),
       position: $('#rPosition').value || null,
       year: $('#rYear').value,
       feesPaid: $('#rFeesPaid').value,
       feesType: $('#rFeesType').value,
       notes: $('#rNotes').value.trim() || null
     };
-    if (!data.firstName || !data.surname || !data.email || !data.phone || !data.location || !data.membership || !data.year || !data.feesPaid || !data.feesType) {
+    if (!data.firstName || !data.surname || !data.email || !data.phone || !data.location || !data.year || !data.feesPaid || !data.feesType) {
       statusEl.textContent = 'Please fill in every field except Notes.';
       statusEl.className = 'status-msg err';
       return;
@@ -1598,7 +1572,7 @@ Required: Life jacket, hat & sunglasses.
       [
         { key: 'firstName', label: 'First name' }, { key: 'surname', label: 'Surname' },
         { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' },
-        { key: 'location', label: 'Location' }, { key: 'membership', label: 'Membership' },
+        { key: 'location', label: 'Location' },
         { key: 'year', label: 'Year' }, { key: 'feesPaid', label: "Fee's paid" },
         { key: 'feesType', label: 'Fees type' }, { key: 'position', label: 'Position' }, { key: 'notes', label: 'Notes' }
       ],
@@ -1640,7 +1614,7 @@ Required: Life jacket, hat & sunglasses.
     try {
       await Promise.all(toCopy.map(r => db.collection('roster').add({
         firstName: r.firstName, surname: r.surname, email: r.email, phone: r.phone,
-        location: r.location, membership: r.membership, year: toYear,
+        location: r.location, year: toYear,
         feesPaid: 'No', feesType: r.feesType, position: r.position || null, notes: r.notes || null,
         uid: r.uid || null, createdBy: myId, createdAt: Date.now()
       })));
