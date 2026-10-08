@@ -1040,7 +1040,14 @@ Required: Life jacket, hat & sunglasses.
     });
     const speciesRows = Object.values(bySpecies).sort((a, b) => b.length - a.length);
 
-    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, anglerRows, anglerRowsByWeight };
+    const bySpeciesWeight = {};
+    withWeight.forEach(c => {
+      const key = c.species || 'Unknown';
+      if (!bySpeciesWeight[key] || c.weight > bySpeciesWeight[key].weight) bySpeciesWeight[key] = c;
+    });
+    const speciesRowsByWeight = Object.values(bySpeciesWeight).sort((a, b) => b.weight - a.weight);
+
+    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, speciesRowsByWeight, anglerRows, anglerRowsByWeight };
   }
 
   function renderBoard() {
@@ -1097,6 +1104,18 @@ Required: Life jacket, hat & sunglasses.
       html += '</tbody></table></div>';
     } else {
       html += '<div class="empty-state">Log a length to start the species board.</div>';
+    }
+    html += '</div>';
+
+    html += '<div class="card"><h3 class="sub-title">Biggest catch per species (by weight)</h3>';
+    if (data.speciesRowsByWeight.length) {
+      html += '<div class="table-scroll"><table><thead><tr><th>Species</th><th>Weight</th><th>Angler</th><th>Date</th></tr></thead><tbody>';
+      data.speciesRowsByWeight.forEach(c => {
+        html += '<tr><td>' + escapeHtml(c.species) + '</td><td>' + c.weight + ' g</td><td>' + escapeHtml(nameOf(c.anglerId)) + '</td><td>' + fmtDate(c.date) + '</td></tr>';
+      });
+      html += '</tbody></table></div>';
+    } else {
+      html += '<div class="empty-state">Log a weight to start the species board.</div>';
     }
     html += '</div>';
 
