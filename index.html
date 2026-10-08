@@ -1306,8 +1306,30 @@ Required: Life jacket, hat & sunglasses.
     });
   }
 
+  // Looks at every membership number already in the roster, finds the
+  // highest, and suggests one more — keeping the same zero-padding width
+  // (e.g. existing "01", "02" suggests "03") if the existing ones use it.
+  function computeNextMembershipNumber() {
+    let maxNum = 0, padLength = 2;
+    roster.forEach(r => {
+      const digits = (r.membership || '').match(/\d+/);
+      if (digits) {
+        const num = parseInt(digits[0], 10);
+        if (num > maxNum) maxNum = num;
+        if (digits[0].length > padLength) padLength = digits[0].length;
+      }
+    });
+    return String(maxNum + 1).padStart(padLength, '0');
+  }
+
   function renderRoster() {
     if (!isAdmin) return;
+    // Only suggest a number while adding a new angler, and only if the
+    // field is still empty — never overwrite something already typed in,
+    // or anything being edited on an existing entry.
+    if (!editingRosterId && !$('#rMembership').value) {
+      $('#rMembership').value = computeNextMembershipNumber();
+    }
     const yearFilter = $('#rosterYearFilter').value || 'all';
     const filtered = yearFilter === 'all' ? roster : roster.filter(r => String(r.year) === String(yearFilter));
     $('#rosterCount').textContent = filtered.length;
