@@ -1817,7 +1817,7 @@ Required: Life jacket, hat & sunglasses.
   }
 
   // ---- auto sign-out after inactivity ----
-  const IDLE_LIMIT_MS = 20 * 60 * 1000; // 20 minutes
+  const IDLE_LIMIT_MS = 30 * 60 * 1000; // 30 minutes
   let idleTimer = null;
   let loggedOutForIdle = false;
 
@@ -1842,7 +1842,7 @@ Required: Life jacket, hat & sunglasses.
       $('#appRoot').style.display = 'none';
       $('#whoami').style.display = 'none';
       if (loggedOutForIdle) {
-        $('#signinStatus').textContent = "You were signed out after 20 minutes of inactivity. Sign back in to continue.";
+        $('#signinStatus').textContent = "You were signed out after 30 minutes of inactivity. Sign back in to continue.";
         loggedOutForIdle = false;
       }
       return;
