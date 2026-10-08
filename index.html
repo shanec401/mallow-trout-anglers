@@ -525,7 +525,8 @@
           <select id="boardYearFilter"></select>
         </div>
       </div>
-      <button type="button" class="ghost-btn" id="boardExportBtn" style="margin-top:14px;padding:6px 12px;font-size:0.78rem;">Export this standings table (CSV)</button>
+      <button type="button" class="ghost-btn" id="boardExportBtn" style="margin-top:14px;padding:6px 12px;font-size:0.78rem;">Export by-length table (CSV)</button>
+      <button type="button" class="ghost-btn" id="boardExportWeightBtn" style="margin-top:14px;margin-left:6px;padding:6px 12px;font-size:0.78rem;">Export by-weight table (CSV)</button>
     </div>
     <div id="boardContent"></div>
   </section>
@@ -1020,14 +1021,17 @@ Required: Life jacket, hat & sunglasses.
     // Full angler-by-angler leaderboard — one row per angler, never repeated —
     // ranked by total length first (the club's main measure), ties broken by
     // total weight then catch count.
-    const anglerRows = Object.entries(byAngler)
+    const anglerRowsBase = Object.entries(byAngler)
       .map(([id, v]) => ({
         anglerId: id, count: v.count, speciesCount: v.species.size,
         totalWeight: v.totalWeight, biggestWeight: v.biggestWeight,
         totalLength: Math.round(v.totalLength * 10) / 10,
         comps: Array.from(v.comps)
-      }))
+      }));
+    const anglerRows = anglerRowsBase.slice()
       .sort((a, b) => b.totalLength - a.totalLength || b.totalWeight - a.totalWeight || b.count - a.count);
+    const anglerRowsByWeight = anglerRowsBase.slice()
+      .sort((a, b) => b.totalWeight - a.totalWeight || b.totalLength - a.totalLength || b.count - a.count);
 
     const bySpecies = {};
     withLength.forEach(c => {
@@ -1036,7 +1040,7 @@ Required: Life jacket, hat & sunglasses.
     });
     const speciesRows = Object.values(bySpecies).sort((a, b) => b.length - a.length);
 
-    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, anglerRows };
+    return { set, biggestByWeight, longest, mostCatchesEntry, mostSpeciesEntry, speciesRows, anglerRows, anglerRowsByWeight };
   }
 
   function renderBoard() {
@@ -1062,10 +1066,21 @@ Required: Life jacket, hat & sunglasses.
       data.mostSpeciesEntry ? escapeHtml(nameOf(data.mostSpeciesEntry[0])) : '');
     html += '</div>';
 
-    html += '<div class="card"><h3 class="sub-title">Anglers (' + data.anglerRows.length + ')</h3>';
+    html += '<div class="card"><h3 class="sub-title">Anglers — by length (' + data.anglerRows.length + ')</h3>';
     html += '<p style="font-size:0.8rem;color:var(--text-soft);margin-top:-10px;">Ranked by total length — one row per angler.</p>';
     html += '<div class="table-scroll"><table><thead><tr><th>#</th><th>Angler</th><th>Fish</th><th>Competition</th><th>Total weight</th><th>Total length</th></tr></thead><tbody>';
     data.anglerRows.forEach((a, i) => {
+      const isMe = a.anglerId === myId;
+      html += '<tr' + (isMe ? ' style="font-weight:700;"' : '') + '><td>' + (i + 1) + '</td><td>' + escapeHtml(nameOf(a.anglerId)) + (isMe ? ' (you)' : '') + '</td>' +
+        '<td>' + a.count + '</td><td>' + escapeHtml(a.comps.join(', ')) + '</td>' +
+        '<td>' + (a.totalWeight ? a.totalWeight + ' g' : '—') + '</td><td>' + (a.totalLength ? a.totalLength + ' cm' : '—') + '</td></tr>';
+    });
+    html += '</tbody></table></div></div>';
+
+    html += '<div class="card"><h3 class="sub-title">Anglers — by weight (' + data.anglerRowsByWeight.length + ')</h3>';
+    html += '<p style="font-size:0.8rem;color:var(--text-soft);margin-top:-10px;">Ranked by total weight — one row per angler.</p>';
+    html += '<div class="table-scroll"><table><thead><tr><th>#</th><th>Angler</th><th>Fish</th><th>Competition</th><th>Total weight</th><th>Total length</th></tr></thead><tbody>';
+    data.anglerRowsByWeight.forEach((a, i) => {
       const isMe = a.anglerId === myId;
       html += '<tr' + (isMe ? ' style="font-weight:700;"' : '') + '><td>' + (i + 1) + '</td><td>' + escapeHtml(nameOf(a.anglerId)) + (isMe ? ' (you)' : '') + '</td>' +
         '<td>' + a.count + '</td><td>' + escapeHtml(a.comps.join(', ')) + '</td>' +
@@ -1751,13 +1766,33 @@ Required: Life jacket, hat & sunglasses.
     if (!data.anglerRows.length) { window.alert('Nothing to export for this selection.'); return; }
     const compLabel = filterCompId ? (competitions.find(c => c.id === filterCompId) || {}).name || 'competition' : 'overall';
     downloadCsv(
-      'mallow-trout-anglers-standings-' + compLabel.replace(/[^a-z0-9]+/gi, '-') + '-' + filterYear + '.csv',
+      'mallow-trout-anglers-standings-by-length-' + compLabel.replace(/[^a-z0-9]+/gi, '-') + '-' + filterYear + '.csv',
       [
         { key: 'rank', label: 'Rank' }, { key: 'angler', label: 'Angler' },
         { key: 'fish', label: 'Fish' }, { key: 'competitions', label: 'Competition' },
         { key: 'totalWeight', label: 'Total weight (g)' }, { key: 'totalLength', label: 'Total length (cm)' }
       ],
       data.anglerRows.map((a, i) => ({
+        rank: i + 1, angler: nameOf(a.anglerId), fish: a.count,
+        competitions: a.comps.join(', '), totalWeight: a.totalWeight || '', totalLength: a.totalLength || ''
+      }))
+    );
+  });
+
+  $('#boardExportWeightBtn').addEventListener('click', () => {
+    const filterCompId = $('#compSelectBoard').value || '';
+    const filterYear = $('#boardYearFilter').value || 'all';
+    const data = computeBoard(filterCompId, filterYear);
+    if (!data.anglerRowsByWeight.length) { window.alert('Nothing to export for this selection.'); return; }
+    const compLabel = filterCompId ? (competitions.find(c => c.id === filterCompId) || {}).name || 'competition' : 'overall';
+    downloadCsv(
+      'mallow-trout-anglers-standings-by-weight-' + compLabel.replace(/[^a-z0-9]+/gi, '-') + '-' + filterYear + '.csv',
+      [
+        { key: 'rank', label: 'Rank' }, { key: 'angler', label: 'Angler' },
+        { key: 'fish', label: 'Fish' }, { key: 'competitions', label: 'Competition' },
+        { key: 'totalWeight', label: 'Total weight (g)' }, { key: 'totalLength', label: 'Total length (cm)' }
+      ],
+      data.anglerRowsByWeight.map((a, i) => ({
         rank: i + 1, angler: nameOf(a.anglerId), fish: a.count,
         competitions: a.comps.join(', '), totalWeight: a.totalWeight || '', totalLength: a.totalLength || ''
       }))
