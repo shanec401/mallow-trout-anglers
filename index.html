@@ -391,6 +391,7 @@
       <button type="submit" class="submit-btn" id="emailAuthSubmit" style="width:100%;">Sign in</button>
     </form>
     <button id="emailAuthToggle" class="auth-toggle-link">Need an account? Sign up</button>
+    <button id="forgotPasswordBtn" class="auth-toggle-link" style="display:block;margin-top:4px;opacity:0.85;">Forgot password?</button>
 
     <p id="signinStatus" class="status-msg"></p>
   </div>
@@ -669,6 +670,41 @@
   const storage = firebase.storage();
   const googleProvider = new firebase.auth.GoogleAuthProvider();
 
+  // A second, independent Firebase app instance pointed at the same project.
+  // Creating a user through the *primary* auth instance would sign the admin
+  // out of their own session and into the new account — using a separate
+  // instance lets us create the account and immediately sign out of it there,
+  // leaving the admin's own session completely untouched.
+  function getSecondaryAuth() {
+    const existing = firebase.apps.find(a => a.name === 'Secondary');
+    const secApp = existing || firebase.initializeApp(firebaseConfig, 'Secondary');
+    return secApp.auth();
+  }
+
+  function generateThrowawayPassword() {
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    return 'Aa1!' + Array.from(bytes, b => b.toString(36)).join('').slice(0, 28);
+  }
+
+  // Creates a real sign-in account for a newly added roster entry, so an
+  // admin can immediately "log on behalf of" them. The angler never sees or
+  // needs this password — they set their own later via "Forgot password?".
+  // Returns { ok: true, uid } or { ok: false, reason: 'exists' | 'error' }.
+  async function createAuthAccountForAngler(email, displayName) {
+    const secondaryAuth = getSecondaryAuth();
+    try {
+      const cred = await secondaryAuth.createUserWithEmailAndPassword(email, generateThrowawayPassword());
+      await cred.user.updateProfile({ displayName });
+      const uid = cred.user.uid;
+      await secondaryAuth.signOut();
+      return { ok: true, uid };
+    } catch (err) {
+      try { await secondaryAuth.signOut(); } catch (e) {}
+      return { ok: false, reason: err && err.code === 'auth/email-already-in-use' ? 'exists' : 'error' };
+    }
+  }
+
   const $ = (sel, root) => (root || document).querySelector(sel);
   const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
 
@@ -811,6 +847,8 @@ Required: Life jacket, hat & sunglasses.
     if (fromCatch && fromCatch.angler) return fromCatch.angler;
     const fromReg = registrations.find(r => r.anglerId === id);
     if (fromReg && fromReg.anglerName) return fromReg.anglerName;
+    const fromRoster = roster.find(r => r.uid === id);
+    if (fromRoster) return (fromRoster.firstName + ' ' + fromRoster.surname).trim();
     if (id === myId && myName) return myName;
     return 'A club member';
   }
@@ -868,12 +906,14 @@ Required: Life jacket, hat & sunglasses.
     renderRoster();
   }
 
-  // Every angler id we know of — anyone who has ever logged a catch or
-  // registered for a competition — for the admin's "log on behalf of" list.
+  // Every angler id we know of — anyone who has ever logged a catch,
+  // registered for a competition, or been added to the roster (and had an
+  // account auto-created) — for the admin's "log on behalf of" list.
   function allKnownAnglerIds() {
     const idSet = new Set();
     catches.forEach(c => c.anglerId && idSet.add(c.anglerId));
     registrations.forEach(r => r.anglerId && idSet.add(r.anglerId));
+    roster.forEach(r => r.uid && idSet.add(r.uid));
     if (myId) idSet.add(myId);
     return Array.from(idSet);
   }
@@ -1269,12 +1309,15 @@ Required: Life jacket, hat & sunglasses.
     );
     let html = '<div class="table-scroll"><table><thead><tr>' +
       '<th>Name</th><th>Email</th><th>Phone</th><th>Location</th><th>Membership</th><th>Year</th>' +
-      '<th>Fee\'s paid</th><th>Fees type</th><th>Notes</th><th></th>' +
+      '<th>Fee\'s paid</th><th>Fees type</th><th>Account</th><th>Notes</th><th></th>' +
       '</tr></thead><tbody>';
     sorted.forEach(r => {
       const paidPill = r.feesPaid === 'Yes'
         ? '<span class="pill approved">Yes</span>'
         : '<span class="pill denied">No</span>';
+      const acctPill = r.uid
+        ? '<span class="pill approved" title="Can be selected under Log on behalf of">Linked</span>'
+        : '<span class="pill none">Not linked</span>';
       html += '<tr>' +
         '<td>' + escapeHtml(r.firstName) + ' ' + escapeHtml(r.surname) + '</td>' +
         '<td>' + escapeHtml(r.email) + '</td>' +
@@ -1284,6 +1327,7 @@ Required: Life jacket, hat & sunglasses.
         '<td>' + escapeHtml(r.year) + '</td>' +
         '<td>' + paidPill + '</td>' +
         '<td>' + escapeHtml(r.feesType) + '</td>' +
+        '<td>' + acctPill + '</td>' +
         '<td>' + (r.notes ? escapeHtml(r.notes) : '—') + '</td>' +
         '<td style="white-space:nowrap;">' +
           '<button class="del-btn roster-edit-btn" data-id="' + escapeHtml(r.id) + '">edit</button>' +
@@ -1371,8 +1415,23 @@ Required: Life jacket, hat & sunglasses.
       } else {
         data.createdBy = myId;
         data.createdAt = Date.now();
-        await db.collection('roster').add(data);
-        statusEl.textContent = 'Angler added.';
+        data.uid = null;
+        const docRef = await db.collection('roster').add(data);
+
+        statusEl.textContent = 'Angler added — setting up their account…';
+        const displayName = (data.firstName + ' ' + data.surname).trim();
+        const acct = await createAuthAccountForAngler(data.email, displayName);
+        if (acct.ok) {
+          await db.collection('roster').doc(docRef.id).update({ uid: acct.uid });
+          statusEl.textContent = 'Angler added. You can log catches for them straight away under "Log on behalf of" — ' +
+            'when ready, they sign in with their email and tap "Forgot password?" to set their own password.';
+        } else if (acct.reason === 'exists') {
+          statusEl.textContent = 'Angler added. An account already exists for that email, so it couldn\'t be auto-linked — ' +
+            'once they sign in themselves, you\'ll be able to log catches for them.';
+        } else {
+          statusEl.textContent = 'Angler added, but their account couldn\'t be set up automatically. ' +
+            'They can still sign up themselves with this email whenever they\'re ready.';
+        }
       }
       statusEl.className = 'status-msg ok';
       resetRosterForm();
@@ -1464,7 +1523,7 @@ Required: Life jacket, hat & sunglasses.
         firstName: r.firstName, surname: r.surname, email: r.email, phone: r.phone,
         location: r.location, membership: r.membership, year: toYear,
         feesPaid: 'No', feesType: r.feesType, notes: r.notes || null,
-        createdBy: myId, createdAt: Date.now()
+        uid: r.uid || null, createdBy: myId, createdAt: Date.now()
       })));
       $('#rosterYearFilter').value = String(toYear);
       renderRoster();
@@ -1804,9 +1863,32 @@ Required: Life jacket, hat & sunglasses.
         await auth.signInWithEmailAndPassword(email, password);
       }
     } catch (err) {
-      statusEl.textContent = err && err.message ? err.message : 'Something went wrong, please try again.';
+      const code = err && err.code;
+      if (code === 'auth/email-already-in-use') {
+        statusEl.innerHTML = 'An account already exists for that email — possibly set up for you by a club admin. ' +
+          'Use "Forgot password?" below to set your own password, then sign in.';
+      } else if (code === 'auth/wrong-password' || code === 'auth/invalid-credential' || code === 'auth/user-not-found') {
+        statusEl.textContent = "That email and password don't match — if this is your first time signing in and an admin set up your details, use \"Forgot password?\" below.";
+      } else {
+        statusEl.textContent = err && err.message ? err.message : 'Something went wrong, please try again.';
+      }
     } finally {
       submitBtn.disabled = false;
+    }
+  });
+
+  $('#forgotPasswordBtn').addEventListener('click', async () => {
+    const email = $('#eaEmail').value.trim();
+    const statusEl = $('#signinStatus');
+    if (!email) {
+      statusEl.textContent = 'Enter your email above first, then tap "Forgot password?" again.';
+      return;
+    }
+    try {
+      await auth.sendPasswordResetEmail(email);
+      statusEl.textContent = 'If an account exists for ' + email + ', a password reset email has been sent. Check your inbox.';
+    } catch (err) {
+      statusEl.textContent = 'If an account exists for ' + email + ', a password reset email has been sent. Check your inbox.';
     }
   });
 
