@@ -449,6 +449,18 @@
               <option value="Perch"></option><option value="Carp"></option><option value="Tench"></option>
               <option value="Bream"></option><option value="Catfish"></option><option value="Salmon"></option>
               <option value="Walleye"></option><option value="Mackerel"></option><option value="Cod"></option>
+              <option value="Conger Eel"></option><option value="Dogfish"></option><option value="Bullhuss"></option>
+              <option value="Tope"></option><option value="Spurdog"></option><option value="Smoothhound"></option>
+              <option value="Flounder"></option><option value="Plaice"></option><option value="Dab"></option>
+              <option value="Turbot"></option><option value="Brill"></option><option value="Sole"></option>
+              <option value="Whiting"></option><option value="Pouting"></option><option value="Coalfish"></option>
+              <option value="Pollack"></option><option value="Poor Cod"></option><option value="Rockling"></option>
+              <option value="Thornback Ray"></option><option value="Blonde Ray"></option><option value="Painted Ray"></option>
+              <option value="Sting Ray"></option><option value="Small-eyed Ray"></option><option value="Mullet"></option>
+              <option value="Wrasse"></option><option value="Garfish"></option><option value="Scad"></option>
+              <option value="Herring"></option><option value="Gurnard"></option><option value="Dragonet"></option>
+              <option value="Triggerfish"></option><option value="Gilthead Bream"></option><option value="Black Bream"></option>
+              <option value="Couch's Bream"></option>
             </datalist>
           </div>
           <div class="field">
@@ -1233,6 +1245,21 @@ Required: Life jacket, hat & sunglasses.
         } else {
           html += '<div style="font-size:0.85rem;color:var(--text-soft);">No pending requests.</div>';
         }
+
+        const alreadyApprovedIds = new Set(regsForComp.filter(r => r.status === 'approved').map(r => r.anglerId));
+        const addableAnglers = allKnownAnglerIds().filter(id => !alreadyApprovedIds.has(id)).sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+        html += '<div style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);">' +
+          '<label style="font-size:0.78rem;color:var(--text-soft);font-weight:600;display:block;margin-bottom:5px;">Add an angler directly (skips registration)</label>' +
+          '<div style="display:flex;gap:6px;flex-wrap:wrap;">' +
+            '<select class="direct-add-select" data-comp="' + escapeHtml(c.id) + '" style="flex:1;min-width:160px;">' +
+              (addableAnglers.length
+                ? addableAnglers.map(id => '<option value="' + escapeHtml(id) + '">' + escapeHtml(nameOf(id)) + '</option>').join('')
+                : '<option value="">No one else to add</option>') +
+            '</select>' +
+            '<button type="button" class="ghost-btn direct-add-btn" data-comp="' + escapeHtml(c.id) + '"' + (addableAnglers.length ? '' : ' disabled') + '>Add</button>' +
+          '</div>' +
+        '</div>';
+
         html += '</div>';
       }
       html += '</div>';
@@ -1248,6 +1275,25 @@ Required: Life jacket, hat & sunglasses.
       renderComps();
       $('#adminNewComp').scrollIntoView({ behavior: 'smooth', block: 'start' });
     }));
+    $$('.direct-add-btn', el).forEach(btn => btn.addEventListener('click', () => {
+      const compId = btn.dataset.comp;
+      const sel = el.querySelector('.direct-add-select[data-comp="' + CSS.escape(compId) + '"]');
+      if (sel && sel.value) onAdminAddAngler(compId, sel.value, btn);
+    }));
+  }
+
+  async function onAdminAddAngler(compId, anglerId, btn) {
+    btn.disabled = true;
+    const anglerName = nameOf(anglerId);
+    try {
+      await db.collection('registrations').doc(compId + '__' + anglerId).set({
+        competitionId: compId, anglerId: anglerId, anglerName: anglerName,
+        status: 'approved', requestedAt: Date.now(), decidedAt: Date.now(), decidedBy: myId
+      });
+    } catch (e) {
+      btn.disabled = false;
+      window.alert('Could not add ' + anglerName + ' to this competition. Please try again.');
+    }
   }
 
   function renderSettings() {
