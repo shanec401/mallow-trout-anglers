@@ -580,7 +580,12 @@
               <option value="Juvenile">Juvenile</option>
             </select>
           </div>
-          <div class="field"></div>
+          <div class="field">
+            <label for="rPosition">Position</label>
+            <select id="rPosition">
+              <option value="">None</option>
+            </select>
+          </div>
         </div>
         <div class="field full">
           <label for="rNotes">Notes</label>
@@ -751,6 +756,10 @@ Required: Life jacket, hat & sunglasses.
 • Nose flush with the start of the measure (no gap)
 ❌ No hands or other objects in the photo`;
 
+  const POSITION_OPTIONS = [
+    "Security", "Chairman", "Treasurer", "Safety Officer", "President", "Committee"
+  ];
+
   const CUP_OPTIONS = [
     "Timmy Lyones Cup",
     "Nellie Willies Cup",
@@ -782,6 +791,11 @@ Required: Life jacket, hat & sunglasses.
     fillYearSelect($('#rosterYearFilter'), true);
     fillYearSelect($('#boardYearFilter'), true);
     fillYearSelect($('#compsYearFilter'), true);
+  })();
+  (function populatePositionSelect() {
+    const sel = $('#rPosition');
+    sel.innerHTML = '<option value="">None</option>' +
+      POSITION_OPTIONS.map(p => '<option value="' + p + '">' + p + '</option>').join('');
   })();
 
   // Turns an array of row-objects into a CSV file and triggers a download.
@@ -1309,7 +1323,7 @@ Required: Life jacket, hat & sunglasses.
     );
     let html = '<div class="table-scroll"><table><thead><tr>' +
       '<th>Name</th><th>Email</th><th>Phone</th><th>Location</th><th>Membership</th><th>Year</th>' +
-      '<th>Fee\'s paid</th><th>Fees type</th><th>Account</th><th>Notes</th><th></th>' +
+      '<th>Fee\'s paid</th><th>Fees type</th><th>Position</th><th>Account</th><th>Notes</th><th></th>' +
       '</tr></thead><tbody>';
     sorted.forEach(r => {
       const paidPill = r.feesPaid === 'Yes'
@@ -1327,6 +1341,7 @@ Required: Life jacket, hat & sunglasses.
         '<td>' + escapeHtml(r.year) + '</td>' +
         '<td>' + paidPill + '</td>' +
         '<td>' + escapeHtml(r.feesType) + '</td>' +
+        '<td>' + (r.position ? escapeHtml(r.position) : '—') + '</td>' +
         '<td>' + acctPill + '</td>' +
         '<td>' + (r.notes ? escapeHtml(r.notes) : '—') + '</td>' +
         '<td style="white-space:nowrap;">' +
@@ -1352,6 +1367,7 @@ Required: Life jacket, hat & sunglasses.
     $('#rPhone').value = r.phone || '';
     $('#rLocation').value = r.location || '';
     $('#rMembership').value = r.membership || '';
+    $('#rPosition').value = r.position || '';
     $('#rYear').value = r.year || '';
     $('#rFeesPaid').value = r.feesPaid || '';
     $('#rFeesType').value = r.feesType || '';
@@ -1384,6 +1400,7 @@ Required: Life jacket, hat & sunglasses.
       phone: $('#rPhone').value.trim(),
       location: $('#rLocation').value.trim(),
       membership: $('#rMembership').value.trim(),
+      position: $('#rPosition').value || null,
       year: $('#rYear').value,
       feesPaid: $('#rFeesPaid').value,
       feesType: $('#rFeesType').value,
@@ -1481,7 +1498,7 @@ Required: Life jacket, hat & sunglasses.
         { key: 'email', label: 'Email' }, { key: 'phone', label: 'Phone' },
         { key: 'location', label: 'Location' }, { key: 'membership', label: 'Membership' },
         { key: 'year', label: 'Year' }, { key: 'feesPaid', label: "Fee's paid" },
-        { key: 'feesType', label: 'Fees type' }, { key: 'notes', label: 'Notes' }
+        { key: 'feesType', label: 'Fees type' }, { key: 'position', label: 'Position' }, { key: 'notes', label: 'Notes' }
       ],
       rows
     );
@@ -1522,7 +1539,7 @@ Required: Life jacket, hat & sunglasses.
       await Promise.all(toCopy.map(r => db.collection('roster').add({
         firstName: r.firstName, surname: r.surname, email: r.email, phone: r.phone,
         location: r.location, membership: r.membership, year: toYear,
-        feesPaid: 'No', feesType: r.feesType, notes: r.notes || null,
+        feesPaid: 'No', feesType: r.feesType, position: r.position || null, notes: r.notes || null,
         uid: r.uid || null, createdBy: myId, createdAt: Date.now()
       })));
       $('#rosterYearFilter').value = String(toYear);
