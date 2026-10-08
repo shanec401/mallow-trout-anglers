@@ -480,7 +480,7 @@
         </div>
         <div class="field">
           <label for="location">Location</label>
-          <input type="text" id="location" placeholder="e.g. North Reservoir">
+          <input type="text" id="location" placeholder="e.g. North Reservoir" value="Blackwater River">
         </div>
         <div class="field full" id="compFieldWrap" style="display:none;">
           <label for="catchCompetition">Competition</label>
@@ -1154,7 +1154,7 @@ Required: Life jacket, hat & sunglasses.
         '<form id="newCompForm">' +
           '<div class="field-row">' +
             '<div class="field"><label for="ncName">Name</label><input type="text" id="ncName" required placeholder="e.g. Autumn Open" value="' + (editing ? escapeHtml(editing.name) : '') + '"></div>' +
-            '<div class="field"><label for="ncLocation">Location (optional)</label><input type="text" id="ncLocation" placeholder="e.g. North Reservoir" value="' + (editing && editing.location ? escapeHtml(editing.location) : '') + '"></div>' +
+            '<div class="field"><label for="ncLocation">Location (optional)</label><input type="text" id="ncLocation" placeholder="e.g. North Reservoir" value="' + (editing ? (editing.location ? escapeHtml(editing.location) : '') : 'Blackwater River') + '"></div>' +
           '</div>' +
           '<div class="field-row">' +
             '<div class="field"><label for="ncStart">Start date</label><input type="date" id="ncStart" required value="' + (editing ? escapeHtml(editing.startDate) : '') + '"></div>' +
@@ -1849,7 +1849,7 @@ Required: Life jacket, hat & sunglasses.
         'ok'
       );
       $('#species').value = 'Trout'; $('#weight').value = ''; $('#length').value = '';
-      $('#location').value = ''; $('#notes').value = '';
+      $('#location').value = 'Blackwater River'; $('#notes').value = '';
       selectedPhotoFile = null;
       $('#photoInput').value = '';
       $('#photoPreview').style.display = 'none';
